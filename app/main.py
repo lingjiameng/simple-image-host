@@ -39,19 +39,17 @@ async def img_get(
     global CACHE_DATA
     lib = Path(IMAGE_LIB)
     if not lib.exists():
-        raise HTTPException(
-            status_code=500, detail="图片库目录" + lib.absolute() + "不存在"
-        )
+        raise HTTPException(status_code=500, detail=f"图片库目录{lib.absolute()}不存在")
     pc_lib = lib / "pc"
     if not pc_lib.exists():
         raise HTTPException(
-            status_code=500, detail="PC图片库目录" + pc_lib.absolute() + "不存在"
+            status_code=500, detail=f"PC图片库目录{pc_lib.absolute()}不存在"
         )
     mobile_lib = lib / "mobile"
     if not mobile_lib.exists():
         raise HTTPException(
             status_code=500,
-            detail="Mobile图片库目录" + mobile_lib.absolute() + "不存在",
+            detail=f"Mobile图片库目录{mobile_lib.absolute()}不存在",
         )
     print(uid)
     print(user_agent)
@@ -83,7 +81,7 @@ def random_img(folder: Path, uid: str):
     imgs = list(folder.iterdir())
     if len(imgs) == 0:
         raise HTTPException(
-            status_code=500, detail="图片库目录" + folder.absolute() + "为空"
+            status_code=500, detail=f"图片库目录{folder.absolute()}为空"
         )
     elif len(imgs) == 1:
         return imgs[0]
