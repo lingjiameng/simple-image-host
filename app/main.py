@@ -1,11 +1,12 @@
 import re
 import os
+import uuid
 import random
 
 from pathlib import Path
 from typing import Annotated, Union
 
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import Cookie, FastAPI, HTTPException, Header
 from fastapi.responses import FileResponse
 
 reg_b = re.compile(
@@ -18,6 +19,7 @@ reg_v = re.compile(
     re.I | re.M,
 )
 
+CACHE_DATA = {}
 
 IMAGE_LIB = "/"
 
@@ -30,29 +32,70 @@ async def root():
 
 
 @app.get("/img", response_class=FileResponse)
-async def root(user_agent: Annotated[Union[str, None], Header()] = None):
+async def img_get(
+    user_agent: Annotated[Union[str, None], Header()] = None,
+    uid: Annotated[Union[str, None], Cookie()] = None,
+):
+    global CACHE_DATA
     lib = Path(IMAGE_LIB)
     if not lib.exists():
-        raise HTTPException(status_code=500, detail="图片库目录"+ lib.absolute() +"不存在")
+        raise HTTPException(
+            status_code=500, detail="图片库目录" + lib.absolute() + "不存在"
+        )
     pc_lib = lib / "pc"
     if not pc_lib.exists():
-        raise HTTPException(status_code=500, detail="PC图片库目录"+ pc_lib.absolute() +"不存在")
+        raise HTTPException(
+            status_code=500, detail="PC图片库目录" + pc_lib.absolute() + "不存在"
+        )
     mobile_lib = lib / "mobile"
     if not mobile_lib.exists():
-        raise HTTPException(status_code=500, detail="Mobile图片库目录"+ mobile_lib.absolute() +"不存在")
-    
+        raise HTTPException(
+            status_code=500,
+            detail="Mobile图片库目录" + mobile_lib.absolute() + "不存在",
+        )
+    print(uid)
     print(user_agent)
+    # 生成uid
+    if not uid:
+        uid = str(uuid.uuid4())
+
     b = reg_b.search(user_agent)
     v = reg_v.search(user_agent[0:4])
     if b or v:
-        img = random.choice(list(mobile_lib.iterdir()))
+        img = random_img(mobile_lib, uid)
     else:
-        img = random.choice(list(pc_lib.iterdir()))
-    return img
+        img = random_img(pc_lib, uid)
+
+    # 记录上次访问的url
+    CACHE_DATA[uid] = img
+    # 缓存过大直接清除缓存
+    if len(CACHE_DATA) > 1000:
+        CACHE_DATA = {}
+
+    headers = {"Cache-Control": "no-cache,max-age=5"}
+    rsp = FileResponse(img, headers=headers)
+    rsp.set_cookie("uid", f"{uid}", samesite="none", secure=True)
+    return rsp
+
+
+def random_img(folder: Path, uid: str):
+    global CACHE_DATA
+    imgs = list(folder.iterdir())
+    if len(imgs) == 0:
+        raise HTTPException(
+            status_code=500, detail="图片库目录" + folder.absolute() + "为空"
+        )
+    elif len(imgs) == 1:
+        return imgs[0]
+    else:
+        if CACHE_DATA and uid and CACHE_DATA.get(uid, None):
+            imgs.remove(CACHE_DATA.get(uid))
+        return random.choice(imgs)
 
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.getenv("SERVER_PORT", "8888"), 10)
-    IMAGE_LIB = os.getenv("IMAGE_LIB", "/app/image")
+    IMAGE_LIB = os.getenv("IMAGE_LIB", r"/app/image")
     uvicorn.run(app, host="0.0.0.0", port=port)
