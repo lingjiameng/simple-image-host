@@ -87,7 +87,9 @@ def random_img(folder: Path, uid: str):
         return imgs[0]
     else:
         if CACHE_DATA and uid and CACHE_DATA.get(uid, None):
-            imgs.remove(CACHE_DATA.get(uid))
+            prv_img = CACHE_DATA.get(uid)
+            if prv_img in imgs:
+                imgs.remove(prv_img)
         return random.choice(imgs)
 
 
